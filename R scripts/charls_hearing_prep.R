@@ -1,4 +1,4 @@
-### Objective: Clean Harmonized CHARLS With Physical Function Measures and Sensory Impairments ###
+### Objective: Clean Harmonized CHARLS With Hearing Impairment ###
 
 ### Notes: Only the first 3 waves have physical measures ###
 

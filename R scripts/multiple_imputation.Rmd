@@ -1,0 +1,95 @@
+---
+title: "Multiple Imputation with Chained Equations"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, highlight=TRUE}
+knitr::opts_chunk$set(echo = TRUE, highlight = TRUE, warning = FALSE)
+rm(list = ls())
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(mice)
+library(ggmice)
+library(miceadds)
+library(micemd)
+```
+
+# Load data
+
+```{r loadData}
+# set working directory
+setwd("/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023")
+load('outputs/pooled_11_15_full.RData')
+
+pooled_11_15 <- pooled_11_15 %>%
+  dplyr::select(-c(gaitScore, standScore, SPPB))
+```
+
+# Adjust column sequence
+
+```{r column sequence and data type adjustment}
+# column name display
+colnames(pooled_11_15)
+
+# column sequence adjustment
+var_list <- c("id", "visit", "hibpe", "diabe", "cancer", "lunge",
+              "hearte", "stroke","arthre", "dyslipe", "livere", 
+              "kidneye", "asthmae", "marital", "smoke", "drink", 
+              "hr", "hhconsumpLevel", "mbmi", "education", "gait",
+              "cstand", "balance", "sex", "residence", "wave", "age")
+
+pooled_11_15_MI <- pooled_11_15 %>%
+  dplyr::select(all_of(var_list))
+
+colnames(pooled_11_15_MI)
+
+pooled_11_15_MI <- pooled_11_15_MI %>%
+  mutate(across(all_of(c(3:20)), factor)) %>%
+  mutate(across(all_of(c(21:23)), as.numeric))
+```
+
+# MICE set-up
+
+```{r MICE set-up, warning=FALSE}
+# set up imputation methods
+ini <- mice(pooled_11_15_MI, maxit = 0)
+meth <- ini$meth
+
+meth
+
+# meth[3:17] <- "2l.bin" # level-1 categorical variable
+# meth[c("gait", "cstand")] <- "2l.lmer" # level-1 continuous/nominal variable
+# meth[c("hhconsumpLevel", "mbmi", "balance")] <- "2l.2stage.pmm"
+# meth[c("education")] <- "2lonly.pmm" # level-2 variable
+
+meth[3:17] <- "2l.bin" # level-1 categorical variable
+meth[c("gait", "cstand", "hhconsumpLevel", "mbmi", "balance")] <- "2l.lmer" # level-1 continuous/nominal variable
+meth[c("education")] <- "2lonly.pmm" # level-2 variable
+
+meth
+
+# predictorMatrix set-up
+imputeMatrix <- ini$predictorMatrix
+imputeMatrix[, "id"] <- -2 # clustering variable
+imputeMatrix[imputeMatrix == 1] <- 2
+imputeMatrix[, "wave"] <- 0
+imputeMatrix[c("hhconsumpLevel", "mbmi", "balance"), ] <- 1
+imputeMatrix[c("hhconsumpLevel", "mbmi", "balance"), "id"] <- 0
+diag(imputeMatrix) <- 0
+```
+
+# Imputation
+
+```{r imputation, warning=FALSE}
+# imputation starts here
+imp <- mice.par(pooled_11_15_MI, m = 50, maxit = 100, method = meth, predictorMatrix = imputeMatrix, seed = 2024)
+```
+
+# Save the imputed dataset
+
+```{r save imputed dataset}
+write.mice.imputation(mi.res = imp, name = "pooled_11_15_imputed", mids2spss = FALSE)
+```
