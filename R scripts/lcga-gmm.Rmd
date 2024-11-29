@@ -1,0 +1,46 @@
+---
+title: "LCGA and GMM"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+library(tidyverse)
+library(lcmm)
+library(haven)
+```
+
+## Data Wrangling
+
+```{r data wrangling}
+load('outputs/pooled_11_15_full.RData')
+```
+
+## LCGA
+
+```{r LCGA analysis}
+# open package library(lcmm)
+# set the seed for random number generator, so results can be # reproduced:
+set.seed(2002)
+
+# run models with 1-4 classes, each with 100 random starts
+# using the 1-class model to set initial start values:
+
+gmm1_2 <- hlme(SPPB ~ visit, subject = "id", random=~1 + visit, ng = 1, data = pooled_11_15)
+
+gmm2_2 <- gridsearch(rep = 100, maxiter = 10, minit = gmm1_2, hlme(SPPB ~ visit, subject = "id", random=~1 + visit, ng = 2, data = pooled_11_15, mixture = ~ visit, nwg=T))
+
+gmm3_2 <- gridsearch(rep = 100, maxiter = 10, minit = gmm1_2, hlme(SPPB ~ visit, subject = "id", random=~1 + visit, ng = 3, data = pooled_11_15, mixture = ~ visit, nwg=T))
+
+gmm4_2 <- gridsearch(rep = 100, maxiter = 10, minit = gmm1_2, hlme(SPPB ~ visit, subject = "id", random=~1 + visit, ng = 4, data = pooled_11_15, mixture = ~ visit, nwg=T))
+
+# make table with results for the 3 models: summarytable(lcga1, lcga2, lcga3)
+summarytable(gmm1_2, gmm2_2, gmm3_2)
+```
+
+
+
+

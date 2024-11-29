@@ -22,6 +22,9 @@ xtgee SPPB i.hr age i.sex i.residence i.education i.marital i.hhconsumpLevel i.m
 * Estimate the average difference - model 4
 xtgee SPPB i.hr age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, family(gaussian) link(identity) corr(unstructured) vce(robust) cformat(%9.2f) pformat(%5.3f) sformat(%8.0g)
 
+// xttobit SPPB i.hr age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, ul(12)
+
+
 predict fitted, mu
 gen res = SPPB - fitted
 histogram res, normal
@@ -37,7 +40,14 @@ keep if interview_count >= 2
 
 * Step 3: Fit the model
 
+xtgee SPPB i.hr##c.visit age i.sex i.residence i.education i.marital i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, family(gaussian) link(identity) corr(unstructured) vce(robust) cformat(%9.2f) pformat(%5.3f) sformat(%8.0g)
+
 xtgee SPPB i.hr##c.visit age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, family(gaussian) link(identity) corr(unstructured) vce(robust) cformat(%9.2f) pformat(%5.3f) sformat(%8.0g)
+
+xttobit SPPB i.hr##c.visit age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, ul(12)
+
+// metobit SPPB i.hr##c.visit age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, || id: visit, covariance(independent) ul(12) vce(robust)
+
 
 lincom visit + 1.hr#c.visit
 
@@ -47,7 +57,13 @@ margins hr, at(visit = (0(1)2))
 * Plot the predicted values
 marginsplot, xdimension(visit) ytitle("Predicted mean SPPB score") xtitle("Study visits")
 
+xtgee SPPB i.hr##c.centered_age i.sex i.residence i.education i.marital i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, family(gaussian) link(identity) corr(unstructured) vce(robust) cformat(%9.4f) pformat(%5.3f) sformat(%8.0g)
+
 xtgee SPPB i.hr##c.centered_age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, family(gaussian) link(identity) corr(unstructured) vce(robust) cformat(%9.4f) pformat(%5.3f) sformat(%8.0g)
+
+xttobit SPPB i.hr##c.centered_age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, ul(12)
+
+metobit SPPB i.hr##c.centered_age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, || id: centered_age, covariance(independent) ul(12) vce(robust)
 
 lincom c.centered_age + 1.hr#c.centered_age
 

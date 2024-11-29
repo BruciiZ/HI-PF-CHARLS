@@ -1,0 +1,86 @@
+---
+title: "First regression for PF measures"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+rm(list = ls())
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(broom)
+library(mice)
+library(ggmice)
+library(miceadds)
+library(multcomp)
+library(sandwich)
+library(broom.mixed)
+library(geepack)
+library(multgee)
+```
+
+## Load complete case data
+
+```{r load imputed data}
+load("outputs/pooled_11_15_full.RData")
+
+pooled_11_15 <- pooled_11_15 %>%
+  mutate(cstand = log(cstand))
+
+fit_formula_SPPB <- formula(SPPB ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_gait <- formula(gait ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_cstand <- formula(cstand ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_balance <- formula(balance ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+```
+
+## Run GEEs for SPPB
+
+```{r SPPB}
+fit.unstr <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_SPPB, id = id, corstr = "unstructured")
+fit.ind <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_SPPB, id = id, corstr = "independence")
+fit.exc <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_SPPB, id = id, corstr = "exchangeable")
+fit.ar1 <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_SPPB, id = id, corstr = "ar1")
+
+QIC(fit.unstr, fit.ind, fit.exc, fit.ar1)
+```
+
+## Run GEEs for gait speed
+
+```{r gait}
+fit.unstr <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_gait, id = id, corstr = "unstructured")
+fit.ind <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_gait, id = id, corstr = "independence")
+fit.exc <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_gait, id = id, corstr = "exchangeable")
+fit.ar1 <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_gait, id = id, corstr = "ar1")
+
+QIC(fit.unstr, fit.ind, fit.exc, fit.ar1)
+```
+
+## Run GEEs for chair stand time
+
+```{r cstand}
+fit.unstr <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_cstand, id = id, corstr = "unstructured")
+fit.ind <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_cstand, id = id, corstr = "independence")
+fit.exc <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_cstand, id = id, corstr = "exchangeable")
+fit.ar1 <- geeglm(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_cstand, id = id, corstr = "ar1")
+
+QIC(fit.unstr, fit.ind, fit.exc, fit.ar1)
+```
+
+## Run GEEs for balance
+
+```{r balance}
+fit.unstr <- ordLORgee(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_balance, id = id, LORstr = "independence")
+fit.ind <- ordLORgee(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_balance, id = id, LORstr = "uniform")
+fit.exc <- ordLORgee(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_balance, id = id, LORstr = "category.exch")
+fit.ar1 <- ordLORgee(data = pooled_11_15[complete.cases(pooled_11_15),], formula = fit_formula_balance, id = id, LORstr = "time.exch")
+
+gee_criteria(fit.unstr, fit.ind, fit.exc, fit.ar1)
+```

@@ -1,0 +1,125 @@
+---
+title: "Table 1 - Baseline Characteristics of CHARLS"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE, highlight=TRUE)
+knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+library(haven)
+library(dplyr)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(lattice)
+library(gtsummary)
+```
+
+# import dataset
+
+```{r raw data}
+load("outputs/pooled_11_15_hearing.RData")
+load("outputs/pooled_11_15_covariates.RData")
+load("outputs/pooled_11_15_PF.RData")
+
+### merge datafarmes ###
+pooled_11_15 <- left_join(pooled_11_15, pooled_11_15_Cov, by = c("id", "wave"))
+pooled_11_15 <- left_join(pooled_11_15, pooled_11_15_PF, by = c("id", "wave"))
+
+# limit the age
+pooled_11_15 <- pooled_11_15 %>%
+  filter(age >= 60) # 13338 participants excluded, 11620 left
+
+# stratify the visit
+pooled_11_15 <- pooled_11_15 %>%
+  arrange(id, wave) %>%
+  group_by(id) %>%
+  mutate(visit = row_number() - 1) %>%
+  ungroup()
+
+# keep only the baseline
+pooled_11_15 <- pooled_11_15 %>%
+  arrange(id, wave) %>%
+  group_by(id) %>%
+  slice(1) %>%
+  ungroup()
+```
+
+# Type conversion
+
+```{r baseline characteristics}
+
+#  [1] "id"             "wave"           "age"            "sex"            "education"      "marital"       
+#  [7] "residence"      "srhear"         "hraid"          "hr"             "visit"          "hhconsumpLevel"
+# [13] "mbmi"           "hibpe"          "diabe"          "cancer"         "lunge"          "hearte"        
+# [19] "stroke"         "arthre"         "dyslipe"        "livere"         "kidneye"        "asthmae"       
+# [25] "smoke"          "drink"          "gait"           "cstand"         "balance"        "gaitScore"     
+# [31] "standScore"     "SPPB"
+
+pooled_11_15 <- pooled_11_15 %>%
+  mutate(hr = factor(hr, labels=c('Impaired Hearing', 'Normal Hearing'), levels=c(1,0))) %>%
+  mutate(sex = as.numeric(sex),
+         education = factor(education,levels = c(1,2,3), labels=c("Less than lower secondary","Upper secondary & vocational training","Tertiary")),
+         marital = as.numeric(marital),
+         residence = as.numeric(residence),
+         hhconsumpLevel = factor(hhconsumpLevel, labels = c("Q1 (< 2628)", "Q2 (2628 – 4528)", "Q3 (4528 - 8288)", "Q4 (> 8288)")),
+         mbmi = factor(mbmi, labels = c('Underweight (< 18.5 kg/m2)', 'Normal Weight (18.5 – 23 kg/m2)', 'Overweight (23 – 25 kg/m2)', 'Obesity (>= 25 kg/m2)')),
+         smoke = as.numeric(smoke),
+         drink = as.numeric(drink),
+         hibpe = as.numeric(hibpe),
+         diabe = as.numeric(diabe),
+         cancer = as.numeric(cancer),
+         lunge = as.numeric(lunge),
+         hearte = as.numeric(hearte),
+         stroke = as.numeric(stroke),
+         arthre = as.numeric(arthre),
+         dyslipe = as.numeric(dyslipe),
+         livere = as.numeric(livere),
+         kidneye = as.numeric(kidneye),
+         asthmae = as.numeric(asthmae),
+         wave = factor(wave, labels = c("Wave 2011", "Wave 2013", "Wave 2015")))
+``` 
+
+# Table creation
+
+```{r table1}
+pooled_11_15 %>%
+  dplyr::select(hr, age, sex, education, marital,
+                residence, hhconsumpLevel, mbmi, smoke, drink,
+                hibpe, diabe, cancer, lunge, hearte,
+                stroke, arthre, dyslipe, livere,
+                kidneye, asthmae, wave) %>%
+  tbl_summary(by = hr, 
+              missing = "no",
+              # missing_text = 'Missing',
+              label = list(age ~ "Age", sex ~ "Gender - female", education ~ "Education level",
+                           marital ~ 'Marital status - alone', residence ~ 'Residence – rural',
+                           hhconsumpLevel ~ 'Annual consumption per capita (RMB)', mbmi ~ 'Body mass index (BMI)',
+                           smoke~'Cigarette consumption – ever smoked', drink~'Alcohol consumption – ever drank',
+                           hibpe~'Hypertension', diabe~'Diabetes', cancer~'Cancer',
+                           lunge~'Lung disease', hearte~'Heart problems', stroke~'Stroke',
+                           arthre~'Arthritis', dyslipe~'Dyslipidemia', livere~'Liver disease',
+                           kidneye~'Kidney disease', asthmae~'Asthma', wave ~ 'Enrollment wave'),
+              statistic = list(all_continuous() ~ "{mean} ({sd})", all_categorical() ~ "{n} ({p}%)", age ~ "{median} ({IQR})"),
+              digits = list(all_categorical() ~ c(0,1),
+                            age ~ c(0,0))) %>%
+  # add_p(pvalue_fun = ~ style_pvalue(.x, digits = 2)) %>%
+  add_overall() %>%
+  # add_n() %>%
+  modify_footnote(
+    all_stat_cols() ~ "Median (IQR) for age; N (%) for other categorical variables."
+  ) %>%
+  modify_caption("**Table 1. Baseline characteristics of study participants in CHARLS wave 2011 - 2015**") %>%
+  modify_spanning_header(c("stat_1", "stat_2") ~ "**Baseline Hearing Status**") %>%
+  bold_labels()
+```
+
+
+

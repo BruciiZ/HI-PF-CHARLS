@@ -1,0 +1,276 @@
+---
+title: "Longitudinal association of hearing impairment and physical functioning - primary analysis"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(broom)
+library(mice)
+library(ggmice)
+library(miceadds)
+library(multcomp)
+library(sandwich)
+library(broom.mixed)
+library(geepack)
+library(multgee)
+```
+
+## Load imputed data
+
+```{r load imputed data}
+load('outputs/pooled_11_15_imputed/pooled_11_15_imputed__DATALIST.Rdata')
+```
+
+## Calculate the SPPB score
+
+```{r sppb score calculation}
+# calculate the SPPB score
+imp <- datlist
+imp <- lapply(imp, function(df) {
+  
+  gait_quartiles <- quantile(df$gait, probs = seq(0, 1, 0.25), na.rm = T)
+  cstand_quartiles <- quantile(df$cstand, probs = seq(0, 1, 0.25), na.rm = T)
+  
+  df <- df %>%
+    mutate(gaitScore = case_when(
+      is.na(gait) ~ NA,
+      gait <= gait_quartiles[["25%"]] ~ 1,
+      gait > gait_quartiles[["25%"]] & gait <= gait_quartiles[["50%"]] ~ 2,
+      gait > gait_quartiles[["50%"]] & gait <= gait_quartiles[["75%"]] ~ 3,
+      gait > gait_quartiles[["75%"]] ~ 4,
+      .default = NA
+      )) %>%
+    mutate(standScore = case_when(
+      is.na(cstand) ~ NA,
+      cstand <= cstand_quartiles[["25%"]] ~ 4,
+      cstand > cstand_quartiles[["25%"]] & cstand <= cstand_quartiles[["50%"]] ~ 3,
+      cstand > cstand_quartiles[["50%"]] & cstand <= cstand_quartiles[["75%"]] ~ 2,
+      cstand > cstand_quartiles[["75%"]] ~ 1,
+      .default = NA
+      ))
+  
+  # sum up the 3 items
+  
+  df <- df %>%
+      mutate(SPPB = rowSums(across(c(gaitScore, standScore, balance)))) %>%
+      arrange(id)
+    
+})
+
+# imp<- lapply(imp, function(df) {
+#     df <- as.data.frame(df)
+# })
+
+imp[[1]] %>%
+  ggplot(aes(x=as.factor(SPPB))) + geom_bar()
+```
+
+## Primary analysis - model 1
+
+# Define model formulas
+
+```{r model formulas}
+fit_formula_SPPB <- formula(SPPB ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + as.factor(wave))
+
+fit_formula_gait <- formula(gait ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + as.factor(wave))
+
+fit_formula_cstand <- formula(log(cstand) ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + as.factor(wave))
+
+fit_formula_balance <- formula(balance ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + as.factor(wave))
+```
+
+# SPPB fitting
+
+```{r sppb fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_SPPB, id = id, corstr = "independence")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 2)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Gait fitting
+
+```{r gait fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_gait, id = id, corstr = "unstructured")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Chair stand time fitting
+
+```{r cstand fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_cstand, id = id, corstr = "unstructured")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 2)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Balance
+
+```{r balance fitting, warning=FALSE}
+model_results <- list()
+vcov_results <- c()
+param_results <- c()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- ordLORgee(data = imp[[i]], formula = fit_formula_balance, id = id, LORstr = "uniform")
+}
+
+for (i in seq_along(model_results)) {
+  param_results <- c(param_results, coef(model_results[[i]])[["hr1"]])
+  vcov_results <- c(vcov_results, vcov(model_results[[i]])[4,4])
+}
+
+pooled_results <- pool.scalar(param_results, vcov_results)
+
+pooled_results$df
+beta_hat <- pooled_results$qbar
+se <- sqrt(pooled_results$ubar)
+beta_hat / se
+1 - pt(beta_hat / se, df = pooled_results$df)
+
+round(exp(beta_hat), 2)
+round(exp(beta_hat + c(-1,1) * 1.96 * se), 2)
+```
+
+# Define model formulas - model 2
+
+```{r model formulas}
+fit_formula_SPPB <- formula(SPPB ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_gait <- formula(gait ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_cstand <- formula(log(cstand) ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_balance <- formula(balance ~ hr + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+```
+
+# SPPB fitting
+
+```{r sppb fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_SPPB, id = id, corstr = "independence")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 2)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Gait fitting
+
+```{r gait fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_gait, id = id, corstr = "unstructured")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Chair stand time fitting
+
+```{r cstand fitting, warning=FALSE}
+model_results <- list()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_cstand, id = id, corstr = "unstructured")
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 2)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1"))
+```
+
+# Balance
+
+```{r balance fitting, warning=FALSE}
+model_results <- list()
+vcov_results <- c()
+param_results <- c()
+
+for (i in seq_along(imp)) {
+  model_results[[i]] <- ordLORgee(data = imp[[i]], formula = fit_formula_balance, id = id, LORstr = "uniform")
+}
+
+for (i in seq_along(model_results)) {
+  param_results <- c(param_results, coef(model_results[[i]])[["hr1"]])
+  vcov_results <- c(vcov_results, vcov(model_results[[i]])[4,4])
+}
+
+pooled_results <- pool.scalar(param_results, vcov_results)
+
+pooled_results$df
+beta_hat <- pooled_results$qbar
+se <- sqrt(pooled_results$ubar)
+beta_hat / se
+1 - pt(beta_hat / se, df = pooled_results$df)
+
+round(exp(beta_hat), 2)
+round(exp(beta_hat + c(-1,1) * 1.96 * se), 2)
+```

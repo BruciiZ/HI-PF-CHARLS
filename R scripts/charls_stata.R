@@ -23,7 +23,7 @@ load("outputs/pooled_11_15_covariates.RData")
 load("outputs/pooled_11_15_PF.RData")
 
 pooled_11_15 <- pooled_11_15 %>%
-  select(-c(srhear, hraid))
+  dplyr::select(-c(srhear, hraid))
 
 ### Merge datafarmes ###
 pooled_11_15 <- left_join(pooled_11_15, pooled_11_15_Cov, by = c("id", "wave"))

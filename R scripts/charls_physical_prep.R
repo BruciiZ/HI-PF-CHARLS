@@ -23,6 +23,7 @@ dfraw <- read_dta("rawdata/H_CHARLS.dta")
 ### Columns to keep ###
 var_list <- c("ID",
               "inw1","inw2","inw3","inw4",
+              "r1agey","r2agey","r3agey","r4agey", # curated age
               "r1wspeed1","r2wspeed1","r3wspeed1", # gait speed 1
               "r1wspeed2","r2wspeed2","r3wspeed2", # gait speed 2
               "r1wspeed", "r2wspeed", "r3wspeed", # average time for gait speed
@@ -46,7 +47,7 @@ dfPF <- dfraw[var_list]
 wave11 <- dfPF %>%
   filter(inw1==1) %>%
   mutate(wave="11") %>%
-  dplyr::select(c(ID, wave,
+  dplyr::select(c(ID, wave, r1agey,
                   r1wspeed1, r1wspeed2, r1wspeed, r1walkcomp,
                   r1sbstan, r1sbsdone, r1sbscomp, r1semitan, r1semicomp, r1fulltan, r1balance,
                   r1chr5sec, r1chr5comp,
@@ -55,7 +56,7 @@ wave11 <- dfPF %>%
 wave13 <- dfPF %>%
   filter(inw2==1) %>%
   mutate(wave="13") %>%
-  dplyr::select(c(ID, wave,
+  dplyr::select(c(ID, wave, r2agey,
                   r2wspeed1, r2wspeed2, r2wspeed, r2walkcomp,
                   r2sbstan, r2sbsdone, r2sbscomp, r2semitan, r2semicomp, r2fulltan, r2balance,
                   r2chr5sec, r2chr5comp,
@@ -64,7 +65,7 @@ wave13 <- dfPF %>%
 wave15 <- dfPF %>%
   filter(inw3==1) %>%
   mutate(wave="15") %>%
-  dplyr::select(c(ID, wave,
+  dplyr::select(c(ID, wave, r3agey,
                   r3wspeed1, r3wspeed2, r3wspeed, r3walkcomp,
                   r3sbstan, r3sbsdone, r3sbscomp, r3semitan, r3semicomp, r3fulltan, r3balance,
                   r3chr5sec, r3chr5comp,
@@ -72,7 +73,7 @@ wave15 <- dfPF %>%
 
 ### rename the columns ###
 
-var_names <- c("id", "wave",
+var_names <- c("id", "wave", "age",
                "gait1", "gait2", "avg_gait", "gait_comp",
                "sbs", "sbs_done", "sbs_comp", "semitan", "semitan_comp", "fulltan", "balance",
                "cstand", "cstand_comp",
@@ -86,6 +87,9 @@ colnames(wave15) <- var_names
 pooled_11_15_PF <- bind_rows(wave11, wave13, wave15)
 
 ### pre-processing PF covariates ###
+pooled_11_15_PF <- pooled_11_15_PF %>%
+  filter(age >= 60)
+
 pooled_11_15_PF <- pooled_11_15_PF %>%
   mutate(gait = case_when(
     is.na(gait1) & is.na(gait2) ~ NA,
@@ -123,11 +127,12 @@ pooled_11_15_PF <- pooled_11_15_PF %>%
   ))
 
 # calculate the SPPB score
-
 gait_quartiles <- quantile(pooled_11_15_PF$gait, probs = seq(0, 1, 0.25), na.rm = T)
 cstand_quartiles <- quantile(pooled_11_15_PF$cstand, probs = seq(0, 1, 0.25), na.rm = T)
+
 pooled_11_15_PF <- pooled_11_15_PF %>%
   mutate(gaitScore = case_when(
+    # gait_comp == 0 ~ 0,
     is.na(gait) ~ NA,
     gait <= gait_quartiles[["25%"]] ~ 1,
     gait > gait_quartiles[["25%"]] & gait <= gait_quartiles[["50%"]] ~ 2,
@@ -136,13 +141,22 @@ pooled_11_15_PF <- pooled_11_15_PF %>%
     .default = NA
   )) %>%
   mutate(standScore = case_when(
+    # cstand_comp == 0 ~ 0,
     is.na(cstand) ~ NA,
     cstand <= cstand_quartiles[["25%"]] ~ 4,
     cstand > cstand_quartiles[["25%"]] & cstand <= cstand_quartiles[["50%"]] ~ 3,
     cstand > cstand_quartiles[["50%"]] & cstand <= cstand_quartiles[["75%"]] ~ 2,
     cstand > cstand_quartiles[["75%"]] ~ 1,
     .default = NA
-  ))
+  )) # %>%
+  # mutate(balance = case_when(
+  #   sbs_comp == 0 | sbs_done == 0 ~ 0,
+  #   sbs_done == 1 ~ 1,
+  #   fulltan <= 2 ~ 2,
+  #   fulltan >= 3 & fulltan <= 9 ~ 3,
+  #   fulltan >= 10 ~ 4,
+  #   .default = NA
+  # ))
 
 pooled_11_15_PF <- pooled_11_15_PF %>%
   mutate(SPPB = case_when(

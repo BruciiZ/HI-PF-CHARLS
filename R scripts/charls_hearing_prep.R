@@ -99,7 +99,8 @@ pooled_11_15 <- pooled_11_15 %>%
   arrange(id, wave) %>%
   group_by(id) %>%
   mutate(visit = row_number() - 1) %>%
-  ungroup()
+  ungroup() %>%
+  filter(age >= 60)
 
 # Hearing impairment and hearing aid
 pooled_11_15 <- pooled_11_15 %>%

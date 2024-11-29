@@ -55,7 +55,7 @@ lincom c.centered_age + 1.hr#c.centered_age
 margins hr, at(centered_age = (0(1)45))
 
 * Plot the predicted values
-marginsplot, xdimension(centered_age) ytitle("Predicted mean gait speed") xtitle("Years after 60")
+marginsplot, xdimension(centered_age) ytitle("Predicted mean gait speed") xtitle("Years after 60") noci
 
 * Fit a linear mixed-effects model
 meglm gait i.hr##c.visit age i.sex i.residence i.education i.marital i.hhconsumpLevel i.mbmi i.smoke i.drink i.hibpe i.diabe i.cancer i.lunge i.hearte i.stroke i.arthre i.dyslipe i.livere i.kidneye i.asthmae i.newWave, || id:c.visit, covariance(unstructured) family(gaussian) link(identity) vce(robust)

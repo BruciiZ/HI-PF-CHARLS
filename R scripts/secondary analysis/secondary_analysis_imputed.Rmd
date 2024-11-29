@@ -1,0 +1,547 @@
+---
+title: "Longitudinal association of hearing impairment and physical functioning - secondary analysis"
+author: "Bruce Zhou"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+rm(list = ls())
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(broom)
+library(mice)
+library(ggmice)
+library(miceadds)
+library(multcomp)
+library(sandwich)
+library(broom.mixed)
+library(geepack)
+library(multgee)
+```
+
+## Load imputed data
+
+```{r load imputed data}
+load('outputs/pooled_11_15_imputed/pooled_11_15_imputed__DATALIST.Rdata')
+```
+
+## Calculate the SPPB score
+
+```{r sppb score calculation}
+# calculate the SPPB score
+imp <- datlist
+imp <- lapply(imp, function(df) {
+  
+  df <- df %>%
+    arrange(id, wave) %>%
+    group_by(id) %>%
+    filter(max(visit) >= 1) %>%
+    ungroup()
+  
+  gait_quartiles <- quantile(df$gait, probs = seq(0, 1, 0.25), na.rm = T)
+  cstand_quartiles <- quantile(df$cstand, probs = seq(0, 1, 0.25), na.rm = T)
+  
+  df <- df %>%
+    mutate(gaitScore = case_when(
+      is.na(gait) ~ NA,
+      gait <= gait_quartiles[["25%"]] ~ 1,
+      gait > gait_quartiles[["25%"]] & gait <= gait_quartiles[["50%"]] ~ 2,
+      gait > gait_quartiles[["50%"]] & gait <= gait_quartiles[["75%"]] ~ 3,
+      gait > gait_quartiles[["75%"]] ~ 4,
+      .default = NA
+      )) %>%
+    mutate(standScore = case_when(
+      is.na(cstand) ~ NA,
+      cstand <= cstand_quartiles[["25%"]] ~ 4,
+      cstand > cstand_quartiles[["25%"]] & cstand <= cstand_quartiles[["50%"]] ~ 3,
+      cstand > cstand_quartiles[["50%"]] & cstand <= cstand_quartiles[["75%"]] ~ 2,
+      cstand > cstand_quartiles[["75%"]] ~ 1,
+      .default = NA
+      ))
+  
+  # sum up the 3 items
+  
+  df <- df %>%
+    mutate(SPPB = rowSums(across(c(gaitScore, standScore, balance)))) %>%
+    arrange(id) %>%
+    mutate(centered_age = (age - 60) / 10)
+    
+})
+
+# imp<- lapply(imp, function(df) {
+#     df <- as.data.frame(df)
+# })
+
+imp[[1]] %>%
+  ggplot(aes(x=as.factor(SPPB))) + geom_bar()
+```
+
+## Secondary analysis - study visits
+
+# Define the prediction dataframes
+
+```{r}
+# Generate a sequence of visit values
+visit_seq <- seq(0, 2, 1)
+
+# Define levels for hearing status (hr)
+hearing_status_levels <- c(0, 1)
+
+# Create the data frame for new data
+new_data_visit <- expand.grid(
+  visit = visit_seq,
+  hr = hearing_status_levels
+)
+
+# Add covariates with reference values
+new_data_visit <- new_data_visit %>%
+  mutate(
+    age = 67,
+    sex = 0,
+    residence = 0,
+    education = 1,
+    marital = 0,
+    hhconsumpLevel = 1,
+    mbmi = 1,
+    smoke = 0,
+    drink = 0,
+    hibpe = 0,
+    diabe = 0,
+    cancer = 0,
+    lunge = 0,
+    hearte = 0,
+    stroke = 0,
+    arthre = 0,
+    dyslipe = 0,
+    livere = 0,
+    kidneye = 0,
+    asthmae = 0,
+    wave = "11"
+  )
+
+# Convert all columns to factors
+new_data_visit[] <- lapply(new_data_visit, as.factor)
+
+# Convert specific columns back to numeric and ensure visit is correct
+new_data_visit <- new_data_visit %>%
+  mutate(
+    sex = as.numeric(as.character(sex)),
+    residence = as.numeric(as.character(residence)),
+    visit = as.numeric(as.character(visit)),
+    age = as.numeric(as.character(age))
+  )
+```
+
+# Define model formulas
+
+```{r model formulas}
+fit_formula_SPPB <- formula(SPPB ~ hr*visit + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_gait <- formula(gait ~ hr*visit + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_cstand <- formula(log(cstand) ~ hr*visit + age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+```
+
+# SPPB fitting
+
+```{r sppb fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_SPPB, id = id, corstr = "independence")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("visit + hr1:visit = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "visit", "hr1:visit"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 2)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_visit$predicted_sppb <- predict(model_results[[1]], newdata = new_data_visit)
+```
+
+# Gait fitting
+
+```{r gait fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_gait, id = id, corstr = "unstructured")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("visit + hr1:visit = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "visit", "hr1:visit"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_visit$predicted_gait <- predict(model_results[[1]], newdata = new_data_visit)
+```
+
+# Chair stand time fitting
+
+```{r cstand fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_cstand, id = id, corstr = "unstructured")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("visit + hr1:visit = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "visit", "hr1:visit"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_visit$predicted_logcstand <- predict(model_results[[1]], newdata = new_data_visit)
+```
+
+```{r}
+# Plot for SPPB Composite Score
+p1 <- ggplot() +
+  geom_line(size = 1, data = new_data_visit, aes(x = visit, y = predicted_sppb, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+  # geom_point(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
+  # geom_line(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
+  scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+  labs(
+    x = "Study Visits Since Baseline Enrollment",
+    y = "Predicted Sppb Composite Score (Points)",
+    color = "Hearing Status"
+  ) +
+  scale_x_continuous(breaks = c(0, 1, 2)) +
+  # scale_y_continuous(breaks = c(8.5, 8.6, 8.7, 8.8, 8.9)) +
+  theme_minimal() +
+  theme(
+    # legend.position = "None",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.line = element_line(color = "black"),  # Add axis lines for a cleaner look
+    panel.grid = element_blank(),              # Remove grid lines
+    # panel.background = element_rect(fill = "white"), # Set a clean background
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold") # Add centering to title
+  )
+
+p1
+
+# # Plot for Gait Speed
+# ggplot(new_data_visit, aes(x = visit, y = predicted_gait, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "Study Visit",
+#     y = "Predicted Gait Speed (m/s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   scale_x_continuous(breaks = c(0, 1, 2))
+# 
+# # Plot for Log Time of 5 Chair Stands
+# ggplot(new_data_visit, aes(x = visit, y = predicted_logcstand, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "Study Visit",
+#     y = "Predicted Log Time of 5 Chair Stands (s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   scale_x_continuous(breaks = c(0, 1, 2))
+```
+
+## Secondary analysis
+
+# Define the prediction dataframes
+
+```{r}
+# Generate a sequence of centered_age values
+centered_age_seq <- seq(0, 4.5, 0.5)
+
+# Define levels for hearing status (hr)
+hearing_status_levels <- c(0, 1)
+
+# Create the data frame for new data
+new_data_age <- expand.grid(
+  centered_age = centered_age_seq,
+  hr = hearing_status_levels
+)
+
+# Add covariates with reference values
+new_data_age <- new_data_age %>%
+  mutate(
+    sex = 0,
+    residence = 0,
+    education = 1,
+    marital = 0,
+    hhconsumpLevel = 1,
+    mbmi = 1,
+    smoke = 0,
+    drink = 0,
+    hibpe = 0,
+    diabe = 0,
+    cancer = 0,
+    lunge = 0,
+    hearte = 0,
+    stroke = 0,
+    arthre = 0,
+    dyslipe = 0,
+    livere = 0,
+    kidneye = 0,
+    asthmae = 0,
+    wave = "11"
+  )
+
+# Convert all columns to factors
+new_data_age[] <- lapply(new_data_age, as.factor)
+
+# Convert specific columns back to numeric and ensure centered_age is correct
+new_data_age <- new_data_age %>%
+  mutate(
+    sex = as.numeric(as.character(sex)),
+    residence = as.numeric(as.character(residence)),
+    centered_age = as.numeric(as.character(centered_age))
+  )
+```
+
+
+# Define model formulas
+
+```{r model formulas}
+fit_formula_SPPB <- formula(SPPB ~ hr*centered_age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_gait <- formula(gait ~ hr*centered_age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+
+fit_formula_cstand <- formula(log(cstand) ~ hr*centered_age + sex + residence + as.factor(education) + marital + as.factor(hhconsumpLevel) + as.factor(mbmi) + smoke + drink + hibpe + diabe + cancer + lunge + hearte + stroke + arthre + dyslipe + livere + kidneye + asthmae + as.factor(wave))
+```
+
+# SPPB fitting
+
+```{r sppb fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_SPPB, id = id, corstr = "independence")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("centered_age + hr1:centered_age = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "centered_age", "hr1:centered_age"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_age$predicted_sppb <- predict(model_results[[1]], newdata = new_data_age)
+```
+
+# Gait fitting
+
+```{r gait fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_gait, id = id, corstr = "unstructured")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("centered_age + hr1:centered_age = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "centered_age", "hr1:centered_age"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(., 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_age$predicted_gait <- predict(model_results[[1]], newdata = new_data_age)
+```
+
+# Chair stand time fitting
+
+```{r cstand fitting, warning=FALSE}
+model_results <- list()
+lin.comb <- list()
+
+for (i in seq_along(imp)) {
+  
+  model_results[[i]] <- geeglm(data = imp[[i]], formula = fit_formula_cstand, id = id, corstr = "unstructured")
+  lin.comb[[i]] <- glht(model_results[[i]], linfct = c("centered_age + hr1:centered_age = 0"))
+  
+}
+
+pool.hearFit <- pool(model_results)
+pool.hearFit %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
+  filter(term %in% c("hr1", "centered_age", "hr1:centered_age"))
+
+pool.hearFit2 <- pool(lin.comb)
+pool.hearFit2 %>%
+  tidy(conf.int = TRUE) %>%
+  mutate(across(c(estimate, conf.low, conf.high), ~round(exp(.), 3)),
+         p.value = round(p.value, 3)) %>%
+  mutate(CI = paste0(conf.low, ', ', conf.high)) %>%
+  mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
+  dplyr::select(contrast, estimate, CI, p.value, beta_CI)
+
+new_data_age$predicted_logcstand <- predict(model_results[[1]], newdata = new_data_age)
+```
+
+```{r}
+# Plot for SPPB Composite Score
+p2 <- ggplot(new_data_age, aes(x = centered_age, y = predicted_sppb, 
+                         color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+  geom_line(size = 1.1) +  # Slightly thicker lines for better visibility
+  # geom_point(aes(shape = factor(hr, labels = c("Normal Hearing", "Impaired Hearing"))), show.legend = F, size = 2.3) +
+  scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+  labs(
+    x = "Age",
+    y = "Predicted SPPB Composite Score (Points)",
+    color = "Hearing Status"
+  ) +
+  scale_y_continuous(breaks = seq(6, 9, 0.5), labels = c("6.00", "6.50", "7.00", "7.50", "8.00", "8.50", "9.00")) +
+  scale_x_continuous(breaks = c(0, 1, 2, 3, 4, 5), labels = c("60", "70", "80", "90", "100", "110")) +
+  # scale_shape_manual(values = c(15, 16)) +  # Customize shapes, e.g., 16 = circle, 17 = triangle
+  theme_minimal() +
+  theme(
+    # legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.line = element_line(color = "black"),  # Add axis lines for a cleaner look
+    panel.grid = element_blank(),              # Remove grid lines
+    # panel.background = element_rect(fill = "white"), # Set a clean background
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold") # Add centering to title
+  )
+
+p2
+
+# Combine p1 and p2 into one layout (1 row, 2 columns)
+combined_plot <- (p1 + theme(legend.position = "none")) +  # Remove legend from p1
+                 (p2 + theme(legend.position = "right")) + # Keep legend on p2
+                 plot_layout(ncol = 2, guides = "collect") # Collect legend and align
+combined_plot
+ggsave("outputs/figure1.pdf", plot = combined_plot, device = pdf, 
+       dpi = 600, width = 15, height = 6, units = "in")
+
+# # Plot for Gait Speed
+# ggplot(new_data_age, aes(x = centered_age, y = predicted_gait, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "10 Years after Age 60",
+#     y = "Predicted Gait Speed (m/s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right")
+# 
+# # Plot for Log Time of 5 Chair Stands
+# ggplot(new_data_age, aes(x = centered_age, y = predicted_logcstand, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "10 Years after Age 60",
+#     y = "Predicted Log Time of 5 Chair Stands (s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right")
+```
+
