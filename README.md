@@ -26,11 +26,11 @@ were done with Stata. But all final analyses results were done using R.
 
 ## Multiple Imputation
 
-**multiple_imputation:** This implements a paralleled multiple imputation\
+**multiple_imputation:** This implements a paralleled multiple imputation
 with chained equations in R. The random seed has been set to 2024.
 
 ## Statistical Analyses
 
-The statistical analyses scripts have been stored in each correspoding fol\
-der, namely `main analysis`, `secondary analysis`, `sensitivity analysis`,\
+The statistical analyses scripts have been stored in each correspoding fol
+der, namely `main analysis`, `secondary analysis`, `sensitivity analysis`,
 and `subgroup analysis`.
