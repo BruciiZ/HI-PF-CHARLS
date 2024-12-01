@@ -106,9 +106,9 @@ pooled_11_15 <- pooled_11_15 %>%
 pooled_11_15 <- pooled_11_15 %>%
   mutate(hr = case_when(
     is.na(hr) ~ NA,
-    hr == 4 | hr == 5 ~ 2,
-    hr == 3 ~ 1,
-    hr %in% c(1, 2) ~ 0,
+    hr == 4 | hr == 5 ~ 2, # severe impairment
+    hr == 3 ~ 1, # moderate impairment
+    hr %in% c(1, 2) ~ 0, # normal
     .default = NA
   )) %>%
   mutate(hraid = case_when(

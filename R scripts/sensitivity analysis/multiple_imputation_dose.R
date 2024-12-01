@@ -16,7 +16,7 @@ rm(list = ls())
 
 # Load data
 setwd("/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023")
-load('outputs/pooled_11_15_full.RData')
+load('outputs/pooled_11_15_dose_full.RData')
 
 pooled_11_15 <- pooled_11_15 %>%
   dplyr::select(-c(gaitScore, standScore, SPPB))
@@ -58,6 +58,6 @@ imp <- mice.par(pooled_11_15_MI, m = 30, maxit = 50, method = meth,
                 predictorMatrix = imputeMatrix, seed = 2024)
 
 # Save the imputed dataset
-write.mice.imputation(mi.res = imp, name = "outputs/pooled_11_15_dose_imputed", mids2spss = FALSE)
+write.mice.imputation(mi.res = imp, name = "pooled_11_15_dose_imputed", mids2spss = FALSE)
 
 # End of script

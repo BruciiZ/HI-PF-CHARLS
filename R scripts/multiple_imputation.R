@@ -58,6 +58,6 @@ imp <- mice.par(pooled_11_15_MI, m = 30, maxit = 50, method = meth,
                 predictorMatrix = imputeMatrix, seed = 2024)
 
 # Save the imputed dataset
-write.mice.imputation(mi.res = imp, name = "outputs/pooled_11_15_imputed", mids2spss = FALSE)
+write.mice.imputation(mi.res = imp, name = "pooled_11_15_imputed", mids2spss = FALSE)
 
 # End of script

@@ -1,5 +1,5 @@
 ---
-title: "Longitudinal association of hearing impairment and physical functioning - primary analysis"
+title: "Longitudinal association of hearing impairment and physical functioning - sensitivity analysis"
 author: "Bruce Zhou"
 date: "`r Sys.Date()`"
 output: html_document
@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = '/Users/bruce/Desktop/GHRC Yan Lab/Hearing impairment & PF 2023')
+rm(list = ls())
 library(haven)
 library(dplyr)
 library(tidyverse)
@@ -26,7 +27,7 @@ library(multgee)
 ## Load imputed data
 
 ```{r load imputed data}
-load('outputs/pooled_11_15_imputed/pooled_11_15_imputed__DATALIST.Rdata')
+load('outputs/pooled_11_15_dose_imputed/pooled_11_15_dose_imputed__DATALIST.Rdata')
 ```
 
 ## Calculate the SPPB score
@@ -73,7 +74,7 @@ imp[[1]] %>%
   ggplot(aes(x=as.factor(SPPB))) + geom_bar()
 ```
 
-## Primary analysis - model 1
+## Sensitivity analysis - model 1
 
 # Define model formulas
 
@@ -104,7 +105,7 @@ pool.hearFit %>%
   mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
   mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
   dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
-  filter(term %in% c("hr1"))
+  filter(term %in% c("hr1", "hr2"))
 ```
 
 # Gait fitting
@@ -124,7 +125,7 @@ pool.hearFit %>%
   mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
   mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
   dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
-  filter(term %in% c("hr1"))
+  filter(term %in% c("hr1", "hr2"))
 ```
 
 # Chair stand time fitting
@@ -144,7 +145,7 @@ pool.hearFit %>%
   mutate(CI = paste0(conf.low ,", ", conf.high)) %>%
   mutate(beta_CI = paste0(estimate, " (", CI, ")")) %>%
   dplyr::select(c(term, estimate, p.value, CI, beta_CI)) %>%
-  filter(term %in% c("hr1"))
+  filter(term %in% c("hr1", "hr2"))
 ```
 
 # Balance
