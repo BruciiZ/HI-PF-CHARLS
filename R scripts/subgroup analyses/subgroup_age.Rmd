@@ -185,7 +185,7 @@ pool_balance <- function(model_results) {
 
   beta_hat <- pooled_results$qbar
   se <- sqrt(pooled_results$ubar)
-  p_value <- 1 - pt(beta_hat / se, df = pooled_results$df)
+  p_value <- 2 * pt(abs(beta_hat / se), df = pooled_results$df, lower.tail = F)
   ci <- round(exp(beta_hat + c(-1,1) * 1.96 * se), 2)
   
   return(tibble(estimate = round(exp(beta_hat), 2), lower = ci[1], upper = ci[2], p_value = p_value))
@@ -338,7 +338,7 @@ pool_balance <- function(model_results, coef = "hr1") {
 
   beta_hat <- pooled_results$qbar
   se <- sqrt(pooled_results$ubar)
-  p_value <- 1 - pt(beta_hat / se, df = pooled_results$df)
+  p_value <- 2 * pt(abs(beta_hat / se), df = pooled_results$df, lower.tail = F)
   ci <- round(exp(beta_hat + c(-1,1) * 1.96 * se), 2)
   
   return(tibble(estimate = round(exp(beta_hat), 2), lower = ci[1], upper = ci[2], p_value = p_value))

@@ -22,6 +22,7 @@ library(sandwich)
 library(broom.mixed)
 library(geepack)
 library(multgee)
+library(patchwork)
 ```
 
 ## Load imputed data
@@ -252,64 +253,6 @@ pool.hearFit2 %>%
 new_data_visit$predicted_logcstand <- predict(model_results[[1]], newdata = new_data_visit)
 ```
 
-```{r}
-# Plot for SPPB Composite Score
-p1 <- ggplot() +
-  geom_line(size = 1, data = new_data_visit, aes(x = visit, y = predicted_sppb, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
-  # geom_point(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
-  # geom_line(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
-  scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
-  labs(
-    x = "Study Visits Since Baseline Enrollment",
-    y = "Predicted Sppb Composite Score (Points)",
-    color = "Hearing Status"
-  ) +
-  scale_x_continuous(breaks = c(0, 1, 2)) +
-  # scale_y_continuous(breaks = c(8.5, 8.6, 8.7, 8.8, 8.9)) +
-  theme_minimal() +
-  theme(
-    # legend.position = "None",
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
-    axis.title = element_text(size = 14, face = "bold"),
-    axis.text = element_text(size = 12),
-    axis.line = element_line(color = "black"),  # Add axis lines for a cleaner look
-    panel.grid = element_blank(),              # Remove grid lines
-    # panel.background = element_rect(fill = "white"), # Set a clean background
-    plot.title = element_text(hjust = 0.5, size = 16, face = "bold") # Add centering to title
-  )
-
-p1
-
-# # Plot for Gait Speed
-# ggplot(new_data_visit, aes(x = visit, y = predicted_gait, 
-#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
-#   geom_line(size = 1) +
-#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
-#   labs(
-#     x = "Study Visit",
-#     y = "Predicted Gait Speed (m/s)",
-#     color = "Hearing Status"
-#   ) +
-#   theme_minimal() +
-#   theme(legend.position = "right") +
-#   scale_x_continuous(breaks = c(0, 1, 2))
-# 
-# # Plot for Log Time of 5 Chair Stands
-# ggplot(new_data_visit, aes(x = visit, y = predicted_logcstand, 
-#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
-#   geom_line(size = 1) +
-#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
-#   labs(
-#     x = "Study Visit",
-#     y = "Predicted Log Time of 5 Chair Stands (s)",
-#     color = "Hearing Status"
-#   ) +
-#   theme_minimal() +
-#   theme(legend.position = "right") +
-#   scale_x_continuous(breaks = c(0, 1, 2))
-```
-
 ## Secondary analysis
 
 # Define the prediction dataframes
@@ -479,6 +422,69 @@ pool.hearFit2 %>%
 
 new_data_age$predicted_logcstand <- predict(model_results[[1]], newdata = new_data_age)
 ```
+## Marginal Plots
+
+# Study visit
+
+```{r}
+# Plot for SPPB Composite Score
+p1 <- ggplot() +
+  geom_line(size = 1, data = new_data_visit, aes(x = visit, y = predicted_sppb, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+  # geom_point(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
+  # geom_line(size = 0.1, alpha = 0.3, data = imp[[1]], aes(x = visit, y = SPPB, color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")), group = id)) +
+  scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+  labs(
+    x = "Study Visits Since Enrollment",
+    y = "Predicted Sppb Composite Score (Points)",
+    color = "Hearing Status"
+  ) +
+  scale_x_continuous(breaks = c(0, 1, 2)) +
+  # scale_y_continuous(breaks = c(8.5, 8.6, 8.7, 8.8, 8.9)) +
+  theme_minimal() +
+  theme(
+    # legend.position = "None",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.line = element_line(color = "black"),  # Add axis lines for a cleaner look
+    panel.grid = element_blank(),              # Remove grid lines
+    # panel.background = element_rect(fill = "white"), # Set a clean background
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold") # Add centering to title
+  )
+
+p1
+
+# # Plot for Gait Speed
+# ggplot(new_data_visit, aes(x = visit, y = predicted_gait, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "Study Visit",
+#     y = "Predicted Gait Speed (m/s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   scale_x_continuous(breaks = c(0, 1, 2))
+# 
+# # Plot for Log Time of 5 Chair Stands
+# ggplot(new_data_visit, aes(x = visit, y = predicted_logcstand, 
+#                      color = factor(hr, labels = c("Normal Hearing", "Impaired Hearing")))) +
+#   geom_line(size = 1) +
+#   scale_color_manual(values = c("#4dbbd5", "#e64b35")) +
+#   labs(
+#     x = "Study Visit",
+#     y = "Predicted Log Time of 5 Chair Stands (s)",
+#     color = "Hearing Status"
+#   ) +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   scale_x_continuous(breaks = c(0, 1, 2))
+```
+
+# Years after 60
 
 ```{r}
 # Plot for SPPB Composite Score
@@ -515,6 +521,7 @@ combined_plot <- (p1 + theme(legend.position = "none")) +  # Remove legend from 
                  (p2 + theme(legend.position = "right")) + # Keep legend on p2
                  plot_layout(ncol = 2, guides = "collect") # Collect legend and align
 combined_plot
+
 ggsave("outputs/figure1.pdf", plot = combined_plot, device = pdf, 
        dpi = 600, width = 15, height = 6, units = "in")
 
