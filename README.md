@@ -11,16 +11,18 @@ Project leader: **Bruce Zhou, BS**.
 ## Data Cleaning
 
 **charls_hearing_prep:** This cleans hearing + demographic covariates.
+
 **charls_physical_prep:** This cleans the SPPB and sub-items.
+
 **charls_covariates_prep:** This cleans the potential confounders.
 
 The order of these scripts does not matter as they are self-contained.
 
 ## Data Merging
 
-**charls_stata:** This merges the 3 dataframes above to form the full\
-dataset. It exports to both R and Stata. Some of the first regressions\
-were done using Stata.
+**charls_stata:** This merges the 3 dataframes above to form the full
+dataset. It exports to both R and Stata. Some of the first regressions
+were done with Stata. But all final analyses results were done using R.
 
 ## Multiple Imputation
 
